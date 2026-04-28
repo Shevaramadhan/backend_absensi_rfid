@@ -1,0 +1,12 @@
+# Mengabaikan folder library (sangat berat)
+node_modules/
+
+# Mengabaikan file konfigurasi rahasia (password database/API key)
+*.env
+
+# Mengabaikan file log
+*.log
+
+# Mengabaikan file sistem
+.DS_Store
+Thumbs.db
