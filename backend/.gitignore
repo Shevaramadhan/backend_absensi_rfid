@@ -10,3 +10,6 @@ node_modules/
 # Mengabaikan file sistem
 .DS_Store
 Thumbs.db
+
+# Mengabaikan file patch/dump database
+*.sql

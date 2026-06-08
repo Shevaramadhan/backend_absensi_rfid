@@ -8,9 +8,9 @@ const buatAdmin = async () => {
 
         // Masukkan ke database
         const [result] = await db.query(
-            `INSERT INTO users (nama, nim, rfid_tag, role, password) 
-             VALUES (?, ?, ?, ?, ?)`,
-            ['Administrator', 'admin', 'RFID-ADMIN', 'Admin', hashedPassword]
+            `INSERT INTO users (nama, nim, email, rfid_tag, role, password) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            ['Administrator', 'admin', 'admin@neotelemetri.com', 'RFID-ADMIN', 'Admin', hashedPassword]
         );
 
         console.log('Akun Admin berhasil dibuat!');
