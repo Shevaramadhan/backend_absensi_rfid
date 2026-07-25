@@ -6,6 +6,7 @@ const { upload, compressImage } = require('../middleware/uploadMiddleware');
 const PengajuanController = require('../controllers/anggotaPengajuanController');
 const authController = require('../controllers/authControllers');
 const exportController = require('../controllers/exportController');
+const jadwalController = require('../controllers/adminJadwalController');
 
 /**
  * @swagger
@@ -136,6 +137,21 @@ router.get('/pengajuan', PengajuanController.getPengajuanAnggota);
  *         description: Password lama salah
  */
 router.put('/change-password', authController.changePassword);
+
+// ==========================================
+// MENU: MELIHAT JADWAL PIKET (GRID)
+// ==========================================
+/**
+ * @swagger
+ * /api/anggota/jadwal:
+ *   get:
+ *     summary: Melihat seluruh matriks jadwal piket (untuk mencari pengganti)
+ *     tags: [Anggota]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/jadwal', jadwalController.getSemuaJadwal);
+
 
 // ==========================================
 // MENU: UPLOAD BUKTI HADIR

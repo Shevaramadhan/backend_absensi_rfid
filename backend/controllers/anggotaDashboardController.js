@@ -14,6 +14,8 @@ const getDashboardAnggota = async (req, res) => {
     const filterTahun = req.query.tahun || new Date().getFullYear();
     const filterSemester = req.query.semester || null; // 'ganjil' | 'genap' | null
 
+    const hariIni = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][new Date().getDay()];
+
     // Tentukan filter ranking: semester atau bulanan
     let rankingFilter = '';
     let rankingParams = [];
@@ -36,17 +38,28 @@ const getDashboardAnggota = async (req, res) => {
 
     const connection = await db.getConnection();
     try {
-        const [hasilStats, hasilRiwayat, hasilRanking] = await Promise.all([
-            // 1. Query Statistik Pribadi Bulan Ini
+        const [hasilStats, hasilGrafik, hasilRiwayat, hasilRanking] = await Promise.all([
+            // 1. Query Statistik Pribadi Hari Ini (Sesuai 3 Kartu di UI)
             connection.query(`
                 SELECT 
-                    COUNT(IF(status = 'Hadir', 1, NULL)) AS total_hadir,
-                    COUNT(IF(status = 'Izin', 1, NULL)) AS total_izin,
-                    COUNT(IF(status = 'Tidak Hadir', 1, NULL)) AS total_tidak_hadir,
-                    COALESCE(SUM(durasi_menit), 0) AS total_durasi_menit
-                FROM attendances
-                WHERE user_id = ? AND MONTH(tanggal) = ? AND YEAR(tanggal) = ?
-            `, [userId, filterBulan, filterTahun]),
+                    COUNT(IF(a.status = 'Hadir', 1, NULL)) AS hadir_hari_ini,
+                    COUNT(IF(a.status = 'Sedang Piket', 1, NULL)) AS sedang_piket,
+                    COUNT(IF(a.id IS NULL OR a.status = 'Tidak Hadir', 1, NULL)) AS tidak_hadir_hari_ini
+                FROM schedules s 
+                LEFT JOIN attendances a ON s.user_id = a.user_id AND a.tanggal = CURDATE() 
+                WHERE s.user_id = ? AND s.hari_piket = ?
+            `, [userId, hariIni]),
+
+            // 1.5. Query Grafik Kehadiran Pribadi (Bulan Ini)
+            connection.query(`
+                SELECT DATE_FORMAT(tanggal, '%d %b') AS label, 
+                       COUNT(IF(status = 'Hadir' OR status = 'Sedang Piket', 1, NULL)) AS total_hadir,
+                       COUNT(IF(status = 'Tidak Hadir', 1, NULL)) AS total_tidak_hadir
+                FROM attendances 
+                WHERE user_id = ? AND MONTH(tanggal) = MONTH(CURDATE()) AND YEAR(tanggal) = YEAR(CURDATE())
+                GROUP BY tanggal, DATE_FORMAT(tanggal, '%d %b') 
+                ORDER BY tanggal ASC
+            `, [userId]),
 
             // 2. Query Riwayat Kehadiran Pribadi (Tabel)
             connection.query(`
@@ -100,7 +113,8 @@ const getDashboardAnggota = async (req, res) => {
             status: 'success',
             message: 'Dashboard anggota berhasil dimuat.',
             data: {
-                statistik: hasilStats[0][0],
+                statistik_hari_ini: hasilStats[0][0] || { hadir_hari_ini: 0, sedang_piket: 0, tidak_hadir_hari_ini: 0 },
+                grafik_kehadiran: hasilGrafik[0],
                 riwayat_kehadiran: hasilRiwayat[0],
                 ranking: {
                     filter: rankingLabel,
