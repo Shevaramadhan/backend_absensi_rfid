@@ -4,9 +4,9 @@ const { kirimEmail } = require('../config/mailer');
 
 // ── POST /api/admin/anggota — Tambah Anggota Baru ──
 const tambahAnggota = async (req, res) => {
-    const { nama, nim, email, id_rfid, jadwal_piket } = req.body;
+    const { nama, sn, nim, email, id_rfid, jadwal_piket } = req.body;
 
-    if (!nama || !nim || !email || !id_rfid || !jadwal_piket || !jadwal_piket.length) {
+    if (!nama || !nim || !sn || !email || !id_rfid || !jadwal_piket || !jadwal_piket.length) {
         return res.status(400).json({ status: 'error', message: 'Semua field wajib diisi (termasuk jadwal).' });
     }
 
@@ -16,8 +16,8 @@ const tambahAnggota = async (req, res) => {
         const defaultPassword = await bcrypt.hash(nim, 10);
 
         const [userResult] = await connection.query(
-            'INSERT INTO users (nama, nim, email, rfid_tag, role, password) VALUES (?, ?, ?, ?, ?, ?)',
-            [nama, nim, email, id_rfid, 'Anggota', defaultPassword]
+            'INSERT INTO users (nama, sn, nim, email, rfid_tag, role, password) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [nama, sn, nim, email, id_rfid, 'Anggota', defaultPassword]
         );
         
         const userId = userResult.insertId;
@@ -55,7 +55,7 @@ const getAnggota = async (req, res) => {
         const [[[{ total }], [rows]]] = await Promise.all([
             db.query(`SELECT COUNT(DISTINCT u.id) AS total FROM users u WHERE u.role = 'Anggota' AND (u.nama LIKE ? OR u.nim LIKE ? OR u.rfid_tag LIKE ?)`, [searchParam, searchParam, searchParam]),
             db.query(`
-                SELECT u.id, u.nama, u.nim, u.email, u.rfid_tag, u.created_at,
+                SELECT u.id, u.nama, u.sn, u.nim, u.email, u.rfid_tag, u.created_at,
                        GROUP_CONCAT(CONCAT(s.hari_piket, '|', sh.nama_shift, '|', s.shift_id) ORDER BY s.hari_piket SEPARATOR ';;') AS jadwal_raw
                 FROM users u
                 LEFT JOIN schedules s ON u.id = s.user_id
@@ -91,7 +91,7 @@ const getAnggotaById = async (req, res) => {
     const userId = req.params.id;
 
     try {
-        const [[user]] = await db.query('SELECT id, nama, nim, email, rfid_tag, created_at FROM users WHERE id = ? AND role = "Anggota"', [userId]);
+        const [[user]] = await db.query('SELECT id, nama, sn, nim, email, rfid_tag, created_at FROM users WHERE id = ? AND role = "Anggota"', [userId]);
         if (!user) return res.status(404).json({ status: 'error', message: 'Anggota tidak ditemukan.' });
 
         const [jadwal] = await db.query(`
@@ -111,10 +111,10 @@ const getAnggotaById = async (req, res) => {
 // ── PUT /api/admin/anggota/:id — Edit Data Anggota ──
 const editAnggota = async (req, res) => {
     const userId = req.params.id;
-    const { nama, nim, email, id_rfid, jadwal_piket } = req.body;
+    const { nama, sn, nim, email, id_rfid, jadwal_piket } = req.body;
 
-    if (!nama || !nim || !email || !id_rfid) {
-        return res.status(400).json({ status: 'error', message: 'Nama, NIM, Email, dan RFID wajib diisi.' });
+    if (!nama || !nim || !sn || !email || !id_rfid) {
+        return res.status(400).json({ status: 'error', message: 'Nama, SN, NIM, Email, dan RFID wajib diisi.' });
     }
 
     const connection = await db.getConnection();
@@ -127,7 +127,7 @@ const editAnggota = async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'NIM, Email, atau RFID sudah dipakai anggota lain.' });
         }
 
-        await connection.query('UPDATE users SET nama = ?, nim = ?, email = ?, rfid_tag = ? WHERE id = ?', [nama, nim, email, id_rfid, userId]);
+        await connection.query('UPDATE users SET nama = ?, sn = ?, nim = ?, email = ?, rfid_tag = ? WHERE id = ?', [nama, sn, nim, email, id_rfid, userId]);
 
         if (jadwal_piket && Array.isArray(jadwal_piket)) {
             await connection.query('DELETE FROM schedules WHERE user_id = ?', [userId]);

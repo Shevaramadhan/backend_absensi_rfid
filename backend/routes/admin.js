@@ -10,6 +10,7 @@ const authController = require('../controllers/authControllers');
 const systemController = require('../controllers/systemController');
 const sheetsController = require('../controllers/adminSheetsController');
 const exportController = require('../controllers/exportController');
+const jadwalController = require('../controllers/adminJadwalController');
 
 
 /**
@@ -185,6 +186,28 @@ router.get('/anggota/:id', anggotaController.getAnggotaById);
  */
 router.put('/anggota/:id', anggotaController.editAnggota);
 router.delete('/anggota/:id', anggotaController.hapusAnggota);
+
+// ==========================================
+// MENU: KELOLA PENJADWALAN PIKET
+// ==========================================
+/**
+ * @swagger
+ * /api/admin/jadwal:
+ *   get:
+ *     summary: Menampilkan seluruh jadwal (Grid)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *   post:
+ *     summary: Menugaskan (Assign) anggota ke shift tertentu
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/jadwal', jadwalController.getSemuaJadwal);
+router.get('/jadwal/rekomendasi', jadwalController.getRekomendasi);
+router.post('/jadwal', jadwalController.tambahJadwal);
+router.delete('/jadwal/:id', jadwalController.hapusJadwal);
 
 // ==========================================
 // MENU: LAPORAN

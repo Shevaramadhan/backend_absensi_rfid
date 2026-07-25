@@ -13,3 +13,6 @@ Thumbs.db
 
 # Mengabaikan file patch/dump database
 *.sql
+
+# Mengabaikan file seeder lokal
+seed_real_data.js

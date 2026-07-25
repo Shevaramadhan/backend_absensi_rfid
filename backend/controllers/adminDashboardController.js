@@ -29,7 +29,7 @@ const getDashboard = async (req, res) => {
         if (isHariKerja) {
             const [[[stats]], [tabel]] = await Promise.all([
                 db.query(`SELECT COUNT(IF(a.status = 'Hadir', 1, NULL)) AS hadir_hari_ini, COUNT(IF(a.status = 'Sedang Piket', 1, NULL)) AS sedang_piket, COUNT(IF(a.id IS NULL OR a.status = 'Tidak Hadir', 1, NULL)) AS belum_atau_tidak_hadir FROM schedules s LEFT JOIN attendances a ON s.user_id = a.user_id AND a.tanggal = CURDATE() WHERE s.hari_piket = ?`, [hariIni]),
-                db.query(`SELECT u.nim, u.nama, sh.nama_shift, sh.jam_mulai, sh.jam_selesai, COALESCE(a.status, 'Belum Hadir') AS status_kehadiran, a.waktu_masuk, a.waktu_keluar, a.durasi_menit, a.tanggal FROM schedules s JOIN users u ON s.user_id = u.id JOIN shifts sh ON s.shift_id = sh.id LEFT JOIN attendances a ON s.user_id = a.user_id AND a.tanggal = CURDATE() WHERE s.hari_piket = ? ORDER BY sh.jam_mulai ASC`, [hariIni])
+                db.query(`SELECT u.nim, u.sn, u.nama, sh.nama_shift, sh.jam_mulai, sh.jam_selesai, COALESCE(a.status, 'Belum Hadir') AS status_kehadiran, a.waktu_masuk, a.waktu_keluar, a.durasi_menit, a.tanggal FROM schedules s JOIN users u ON s.user_id = u.id JOIN shifts sh ON s.shift_id = sh.id LEFT JOIN attendances a ON s.user_id = a.user_id AND a.tanggal = CURDATE() WHERE s.hari_piket = ? ORDER BY sh.jam_mulai ASC`, [hariIni])
             ]);
             dataTotal = { ...dataTotal, ...stats };
             tabelRingkasan = tabel;
@@ -55,7 +55,7 @@ const getPengajuan = async (req, res) => {
 
     try {
         const [pengajuan] = await db.query(
-            `SELECT p.*, u.nama, u.nim, s.nama_shift AS shift_tujuan, sa.nama_shift AS shift_asal
+            `SELECT p.*, u.nama, u.nim, u.sn, s.nama_shift AS shift_tujuan, sa.nama_shift AS shift_asal
              FROM permissions p JOIN users u ON p.user_id = u.id LEFT JOIN shifts s ON p.shift_id = s.id LEFT JOIN shifts sa ON p.shift_awal_id = sa.id
              WHERE (u.nama LIKE ? OR u.nim LIKE ?) ${whereStatus} ORDER BY p.id DESC`, params
         );
@@ -126,7 +126,7 @@ const getRanking = async (req, res) => {
 
     try {
         const [ranking] = await db.query(`
-            SELECT u.nama, u.nim, u.rfid_tag, COALESCE(SUM(a.durasi_menit), 0) AS total_durasi_menit, COUNT(a.id) AS total_kehadiran
+            SELECT u.nama, u.nim, u.sn, u.rfid_tag, COALESCE(SUM(a.durasi_menit), 0) AS total_durasi_menit, COUNT(a.id) AS total_kehadiran
             FROM users u LEFT JOIN attendances a ON u.id = a.user_id AND a.status = 'Hadir' ${rankingFilter}
             WHERE u.role = 'Anggota' GROUP BY u.id ORDER BY total_durasi_menit DESC, total_kehadiran DESC
         `, rankingParams);

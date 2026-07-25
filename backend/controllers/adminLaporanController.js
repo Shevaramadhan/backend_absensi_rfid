@@ -49,6 +49,7 @@ const getLaporan = async (req, res) => {
                     a.id,
                     u.nama, 
                     u.nim, 
+                    u.sn,
                     sh.nama_shift, 
                     a.tanggal, 
                     a.waktu_masuk, 
