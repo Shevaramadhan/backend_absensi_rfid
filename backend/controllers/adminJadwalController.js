@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { runPythonScript } = require('../utils/pythonRunner');
 
 // ── GET /api/admin/jadwal — Menampilkan Grid Jadwal Piket ──
 // Endpoint ini memuntahkan jadwal seluruh anggota untuk diisi ke dalam Grid (Senin-Jumat, Shift 1-4)
@@ -48,8 +49,7 @@ const getSemuaJadwal = async (req, res) => {
     }
 };
 
-// ── GET /api/admin/jadwal/rekomendasi — Memuat Daftar Anggota untuk Ditugaskan ──
-// Sementara sebelum ada ML, memunculkan semua anggota, dan ditandai (disabled) jika sudah piket di hari yang sama
+// ── GET /api/admin/jadwal/rekomendasi — Memuat Daftar Anggota (ML SPK) ──
 const getRekomendasi = async (req, res) => {
     const { hari, shift_id } = req.query;
 
@@ -58,38 +58,75 @@ const getRekomendasi = async (req, res) => {
     }
 
     try {
-        // Ambil semua pengguna, dan cek apakah mereka punya jadwal di 'hari' tersebut
-        const [anggota] = await db.query(`
-            SELECT 
-                u.id AS user_id, 
-                u.nama, 
-                u.nim, 
-                u.sn,
-                IF(s.id IS NOT NULL, 1, 0) AS is_terjadwal_hari_ini,
-                s.shift_id AS jadwal_bentrok_shift_id
-            FROM users u
-            LEFT JOIN schedules s ON u.id = s.user_id AND s.hari_piket = ?
-            WHERE u.role = 'Anggota'
-            ORDER BY is_terjadwal_hari_ini ASC, u.nama ASC
-        `, [hari]);
+        // 1. Ambil Data Dasar
+        const [users] = await db.query("SELECT id, nama, sn, jenis_kelamin FROM users WHERE role='Anggota'");
+        const [schedules] = await db.query("SELECT user_id, hari_piket, shift_id FROM schedules");
+        
+        let courses = [];
+        let kriteria = [];
+        try {
+            [courses] = await db.query("SELECT user_id, hari, sks, jam_mulai, jam_selesai FROM member_courses");
+            [kriteria] = await db.query("SELECT kode, tipe, bobot FROM kriteria");
+        } catch (e) {
+            console.log('Tabel ML belum dipatch. Menggunakan data kosong.');
+        }
 
-        // Transformasi hasil query menjadi format yang sesuai dengan UI 'Rekomendasi'
-        const rekomendasi = anggota.map(a => ({
-            user_id: a.user_id,
-            nama: a.nama,
-            sn: a.sn,
-            status: a.is_terjadwal_hari_ini ? (a.jadwal_bentrok_shift_id == shift_id ? 'Sudah Terjadwal di Shift Ini' : 'Sudah Terjadwal di Shift Lain Hari Ini') : 'Belum Terjadwal',
-            bisa_ditugaskan: a.is_terjadwal_hari_ini === 0
-        }));
+        // 2. Susun JSON untuk Python
+        const members = users.map(u => {
+            const memberSchedules = schedules.filter(s => s.user_id === u.id);
+            const memberCourses = courses.filter(c => c.user_id === u.id);
+
+            const jadwal = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'].map(h => {
+                const dayCourses = memberCourses.filter(c => c.hari === h);
+                const totalSks = dayCourses.reduce((sum, c) => sum + (c.sks || 0), 0);
+                const kelasKrs = dayCourses.map(c => ({
+                    jamMulai: c.jam_mulai,
+                    jamSelesai: c.jam_selesai
+                }));
+
+                const getShiftStatus = (sId) => memberSchedules.some(s => s.hari_piket === h && s.shift_id === sId) ? 'piket' : 'kosong';
+
+                return {
+                    hari: h,
+                    sks: totalSks,
+                    kelas_krs: kelasKrs,
+                    shift1: getShiftStatus(1),
+                    shift2: getShiftStatus(2),
+                    shift3: getShiftStatus(3),
+                    shift4: getShiftStatus(4)
+                };
+            });
+
+            return { id: u.id, nama: u.nama, jenis_kelamin: u.jenis_kelamin || 'L', jadwal };
+        });
+
+        const inputData = { members, kriteria };
+
+        // 3. Panggil Skrip Python secara Native (Child Process)
+        const hasilPython = await runPythonScript('spkController.py', [hari, shift_id, JSON.stringify(inputData)]);
+
+        // 4. Format Output untuk Frontend
+        // Jika anggota tidak aktif (sks 0 dan piket 0), Python akan me-skip mereka.
+        const rekomendasi = hasilPython.map(r => {
+            const originalUser = users.find(u => u.id === r.anggotaId);
+            return {
+                user_id: r.anggotaId,
+                nama: r.nama,
+                sn: originalUser ? originalUser.sn : "-",
+                status: `Direkomendasikan (Skor: ${r.v})`,
+                bisa_ditugaskan: true
+            };
+        });
 
         res.status(200).json({ 
             status: 'success', 
-            message: `Rekomendasi sementara untuk ${hari} Shift ${shift_id}`,
+            message: `Rekomendasi AI untuk ${hari} Shift ${shift_id} berhasil dimuat.`,
             data: rekomendasi 
         });
+
     } catch (error) {
-        console.error('Error Get Rekomendasi:', error);
-        res.status(500).json({ status: 'error', message: 'Gagal memuat daftar rekomendasi.' });
+        console.error('Error Get Rekomendasi ML:', error);
+        res.status(500).json({ status: 'error', message: 'Gagal memuat daftar rekomendasi AI.' });
     }
 };
 

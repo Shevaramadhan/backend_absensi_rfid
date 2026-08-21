@@ -194,7 +194,7 @@ router.delete('/anggota/:id', anggotaController.hapusAnggota);
  * @swagger
  * /api/admin/jadwal:
  *   get:
- *     summary: Menampilkan seluruh jadwal (Grid)
+ *     summary: Menampilkan seluruh jadwal piket (Format Grid)
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
@@ -203,10 +203,68 @@ router.delete('/anggota/:id', anggotaController.hapusAnggota);
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               user_id:
+ *                 type: integer
+ *               hari_piket:
+ *                 type: string
+ *               shift_id:
+ *                 type: integer
  */
 router.get('/jadwal', jadwalController.getSemuaJadwal);
-router.get('/jadwal/rekomendasi', jadwalController.getRekomendasi);
 router.post('/jadwal', jadwalController.tambahJadwal);
+
+/**
+ * @swagger
+ * /api/admin/jadwal/rekomendasi:
+ *   get:
+ *     summary: Meminta rekomendasi anggota untuk ditugaskan (Terintegrasi ML SAW)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: hari
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "Senin"
+ *       - in: query
+ *         name: shift_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: Berhasil memuat daftar rekomendasi dari AI
+ */
+router.get('/jadwal/rekomendasi', jadwalController.getRekomendasi);
+
+/**
+ * @swagger
+ * /api/admin/jadwal/{id}:
+ *   delete:
+ *     summary: Menghapus penugasan jadwal piket anggota
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Jadwal piket berhasil dihapus
+ */
 router.delete('/jadwal/:id', jadwalController.hapusJadwal);
 
 // ==========================================
