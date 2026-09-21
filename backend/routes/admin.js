@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
 const { verifyAdmin } = require('../middleware/authMiddleware');
 
 // Import semua controller yang sudah dipisah
@@ -22,6 +24,29 @@ const jadwalController = require('../controllers/adminJadwalController');
 
 // Middleware untuk semua route admin
 router.use(verifyAdmin);
+
+// Konfigurasi Multer untuk Upload KRS
+const storageKrs = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/krs/');
+    },
+    filename: (req, file, cb) => {
+        // Sanitasi nama file agar aman dari karakter aneh
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '');
+        cb(null, Date.now() + '-' + safeName);
+    }
+});
+
+const uploadKrs = multer({ 
+    storage: storageKrs,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Hanya file PDF yang diizinkan untuk KRS.'), false);
+        }
+    }
+});
 
 // ==========================================
 // MENU: DASHBOARD
@@ -71,13 +96,16 @@ router.get('/dashboard', dashboardController.getDashboard);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               nama:
  *                 type: string
  *                 example: Budi Santoso
+ *               sn:
+ *                 type: string
+ *                 example: 123456789
  *               nim:
  *                 type: string
  *                 example: 210511002
@@ -87,23 +115,24 @@ router.get('/dashboard', dashboardController.getDashboard);
  *               id_rfid:
  *                 type: string
  *                 example: RFID-002
+ *               jenis_kelamin:
+ *                 type: string
+ *                 enum: [L, P]
+ *                 example: L
  *               jadwal_piket:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     hari:
- *                       type: string
- *                       example: Senin
- *                     shift_id:
- *                       type: integer
- *                       example: 1
+ *                 type: string
+ *                 description: "String JSON array, contoh: [{\"hari\":\"Senin\", \"shift_id\":1}]"
+ *                 example: "[{\"hari\":\"Senin\", \"shift_id\":1}]"
+ *               file_krs:
+ *                 type: string
+ *                 format: binary
+ *                 description: File PDF KRS untuk diekstrak jadwal kuliahnya oleh AI
  *     responses:
  *       201:
  *         description: Anggota berhasil ditambahkan
  */
 router.get('/anggota', anggotaController.getAnggota);
-router.post('/anggota', anggotaController.tambahAnggota);
+router.post('/anggota', uploadKrs.single('file_krs'), anggotaController.tambahAnggota);
 
 /**
  * @swagger
@@ -147,13 +176,16 @@ router.get('/anggota/:id', anggotaController.getAnggotaById);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
  *               nama:
  *                 type: string
  *                 example: "Andi Pratama Update"
+ *               sn:
+ *                 type: string
+ *                 example: "123456789"
  *               nim:
  *                 type: string
  *                 example: "210511002"
@@ -163,17 +195,18 @@ router.get('/anggota/:id', anggotaController.getAnggotaById);
  *               id_rfid:
  *                 type: string
  *                 example: "RFID-002"
+ *               jenis_kelamin:
+ *                 type: string
+ *                 enum: [L, P]
+ *                 example: L
  *               jadwal_piket:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     hari:
- *                       type: string
- *                       example: "Senin"
- *                     shift_id:
- *                       type: integer
- *                       example: 1
+ *                 type: string
+ *                 description: "String JSON array, contoh: [{\"hari\":\"Senin\", \"shift_id\":1}]"
+ *                 example: "[{\"hari\":\"Senin\", \"shift_id\":1}]"
+ *               file_krs:
+ *                 type: string
+ *                 format: binary
+ *                 description: Upload file PDF KRS baru (Opsional)
  *     responses:
  *       200:
  *         description: Data anggota berhasil diperbarui
@@ -184,7 +217,7 @@ router.get('/anggota/:id', anggotaController.getAnggotaById);
  *       500:
  *         description: Server error
  */
-router.put('/anggota/:id', anggotaController.editAnggota);
+router.put('/anggota/:id', uploadKrs.single('file_krs'), anggotaController.editAnggota);
 router.delete('/anggota/:id', anggotaController.hapusAnggota);
 
 // ==========================================

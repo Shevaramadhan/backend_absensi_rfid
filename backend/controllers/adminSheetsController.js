@@ -103,28 +103,15 @@ const getStatusSheets = async (req, res) => {
 };
 
 // ============================================================
-// POST /api/admin/sheets/sync — Sync data absensi ke Spreadsheet
-// Query param: ?bulan=6&tahun=2026 (default: bulan & tahun saat ini)
+// FUNGSI UTAMA: Memicu sinkronisasi tanpa req/res (Bisa untuk Cron & Realtime)
 // ============================================================
-const syncAbsensiKeSheets = async (req, res) => {
+const triggerSheetSync = async (bulanParam, tahunParam) => {
     const sheets = getSheetsClient();
+    if (!sheets) throw new Error('Google Sheets belum dikonfigurasi (Client null).');
+    if (!SHEET_ID || SHEET_ID === 'your_spreadsheet_id_here') throw new Error('GOOGLE_SHEET_ID belum diisi di .env');
 
-    if (!sheets) {
-        return res.status(503).json({
-            status: 'error',
-            message: 'Google Sheets belum dikonfigurasi. Isi variabel di .env terlebih dahulu.'
-        });
-    }
-
-    if (!SHEET_ID || SHEET_ID === 'your_spreadsheet_id_here') {
-        return res.status(503).json({
-            status: 'error',
-            message: 'GOOGLE_SHEET_ID belum diisi di .env'
-        });
-    }
-
-    const bulan = parseInt(req.query.bulan) || new Date().getMonth() + 1;
-    const tahun = parseInt(req.query.tahun) || new Date().getFullYear();
+    const bulan = bulanParam || new Date().getMonth() + 1;
+    const tahun = tahunParam || new Date().getFullYear();
     const namaSheet = getNamaSheet(bulan, tahun);
 
     const connection = await db.getConnection();
@@ -150,11 +137,11 @@ const syncAbsensiKeSheets = async (req, res) => {
         `, [bulan, tahun]);
 
         if (rows.length === 0) {
-            return res.status(200).json({
+            return {
                 status: 'warning',
                 message: `Tidak ada data absensi untuk ${namaSheet}.`,
                 data: { jumlah_baris: 0 }
-            });
+            };
         }
 
         // 2. Pastikan sheet bulan ini sudah ada (buat jika belum)
@@ -224,7 +211,7 @@ const syncAbsensiKeSheets = async (req, res) => {
             }
         });
 
-        res.status(200).json({
+        return {
             status: 'success',
             message: `Data absensi ${namaSheet} berhasil disinkronkan ke Google Spreadsheet.`,
             data: {
@@ -232,18 +219,36 @@ const syncAbsensiKeSheets = async (req, res) => {
                 jumlah_baris: rows.length,
                 spreadsheet_id: SHEET_ID
             }
-        });
+        };
 
     } catch (error) {
-        console.error('Error Sync ke Sheets:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Gagal sync ke Google Spreadsheet.',
-            detail: error.message
-        });
+        console.error('[SHEETS] Error Sync ke Sheets:', error);
+        throw error;
     } finally {
         connection.release();
     }
 };
 
-module.exports = { getStatusSheets, syncAbsensiKeSheets };
+// ============================================================
+// POST /api/admin/sheets/sync — Sync HTTP Handler (Manual dari Admin)
+// ============================================================
+const syncAbsensiKeSheets = async (req, res) => {
+    try {
+        const bulan = parseInt(req.query.bulan);
+        const tahun = parseInt(req.query.tahun);
+        const result = await triggerSheetSync(bulan, tahun);
+        
+        if (result.status === 'warning') {
+            return res.status(200).json(result);
+        }
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(503).json({
+            status: 'error',
+            message: 'Gagal sync ke Google Spreadsheet.',
+            detail: error.message
+        });
+    }
+};
+
+module.exports = { getStatusSheets, syncAbsensiKeSheets, triggerSheetSync };

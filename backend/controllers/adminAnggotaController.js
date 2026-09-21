@@ -1,12 +1,20 @@
 const db = require('../config/database');
 const bcrypt = require('bcrypt');
+const fs = require('fs');
+const path = require('path');
 const { kirimEmail } = require('../config/mailer');
+const { runPythonScript } = require('../utils/pythonRunner');
 
 // ── POST /api/admin/anggota — Tambah Anggota Baru ──
 const tambahAnggota = async (req, res) => {
-    const { nama, sn, nim, email, id_rfid, jadwal_piket } = req.body;
+    const { nama, sn, nim, email, id_rfid, jadwal_piket, jenis_kelamin } = req.body;
 
-    if (!nama || !nim || !sn || !email || !id_rfid || !jadwal_piket || !jadwal_piket.length) {
+    let parsedJadwalPiket = [];
+    if (typeof jadwal_piket === 'string') {
+        try { parsedJadwalPiket = JSON.parse(jadwal_piket); } catch (e) { }
+    } else { parsedJadwalPiket = jadwal_piket || []; }
+
+    if (!nama || !nim || !sn || !email || !id_rfid || !parsedJadwalPiket.length) {
         return res.status(400).json({ status: 'error', message: 'Semua field wajib diisi (termasuk jadwal).' });
     }
 
@@ -14,16 +22,32 @@ const tambahAnggota = async (req, res) => {
     try {
         await connection.beginTransaction();
         const defaultPassword = await bcrypt.hash(nim, 10);
+        const fileName = req.file ? req.file.filename : null;
 
         const [userResult] = await connection.query(
-            'INSERT INTO users (nama, sn, nim, email, rfid_tag, role, password) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [nama, sn, nim, email, id_rfid, 'Anggota', defaultPassword]
+            'INSERT INTO users (nama, sn, nim, email, rfid_tag, role, password, jenis_kelamin, file_krs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [nama, sn, nim, email, id_rfid, 'Anggota', defaultPassword, jenis_kelamin || 'L', fileName]
         );
         
         const userId = userResult.insertId;
-        const scheduleValues = jadwal_piket.map(jadwal => [userId, jadwal.shift_id, jadwal.hari]); 
+        const scheduleValues = parsedJadwalPiket.map(jadwal => [userId, jadwal.shift_id, jadwal.hari]); 
         
         await connection.query('INSERT INTO schedules (user_id, shift_id, hari_piket) VALUES ?', [scheduleValues]);
+
+        // Parsing PDF jika file diupload
+        if (req.file) {
+            try {
+                const parseResult = await runPythonScript('pdfParserController.py', [req.file.path]);
+                if (parseResult.status === 'success' && parseResult.data.length > 0) {
+                    const courseValues = parseResult.data.map(c => [userId, c.matakuliah, c.sks, c.hari, c.jamMulai, c.jamSelesai]);
+                    await connection.query('INSERT INTO member_courses (user_id, matakuliah, sks, hari, jam_mulai, jam_selesai) VALUES ?', [courseValues]);
+                }
+            } catch (err) {
+                console.error('Error mem-parsing PDF KRS:', err);
+                // Proses daftar tetap jalan meski gagal parse KRS
+            }
+        }
+
         await connection.commit();
 
         // Background Task: Kirim Notifikasi Email
@@ -111,7 +135,12 @@ const getAnggotaById = async (req, res) => {
 // ── PUT /api/admin/anggota/:id — Edit Data Anggota ──
 const editAnggota = async (req, res) => {
     const userId = req.params.id;
-    const { nama, sn, nim, email, id_rfid, jadwal_piket } = req.body;
+    const { nama, sn, nim, email, id_rfid, jadwal_piket, jenis_kelamin } = req.body;
+
+    let parsedJadwalPiket = [];
+    if (typeof jadwal_piket === 'string') {
+        try { parsedJadwalPiket = JSON.parse(jadwal_piket); } catch (e) { }
+    } else { parsedJadwalPiket = jadwal_piket || []; }
 
     if (!nama || !nim || !sn || !email || !id_rfid) {
         return res.status(400).json({ status: 'error', message: 'Nama, SN, NIM, Email, dan RFID wajib diisi.' });
@@ -127,14 +156,37 @@ const editAnggota = async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'NIM, Email, atau RFID sudah dipakai anggota lain.' });
         }
 
-        await connection.query('UPDATE users SET nama = ?, sn = ?, nim = ?, email = ?, rfid_tag = ? WHERE id = ?', [nama, sn, nim, email, id_rfid, userId]);
-
-        if (jadwal_piket && Array.isArray(jadwal_piket)) {
-            await connection.query('DELETE FROM schedules WHERE user_id = ?', [userId]);
-            if (jadwal_piket.length > 0) {
-                const jadwalValues = jadwal_piket.map(jadwal => [userId, jadwal.shift_id, jadwal.hari]);
-                await connection.query('INSERT INTO schedules (user_id, shift_id, hari_piket) VALUES ?', [jadwalValues]);
+        // Jika upload file baru, update database dan hapus yang lama
+        if (req.file) {
+            const [[oldUser]] = await connection.query('SELECT file_krs FROM users WHERE id = ?', [userId]);
+            if (oldUser && oldUser.file_krs) {
+                const oldPath = path.join(__dirname, '../uploads/krs', oldUser.file_krs);
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
             }
+
+            await connection.query('UPDATE users SET nama = ?, sn = ?, nim = ?, email = ?, rfid_tag = ?, jenis_kelamin = ?, file_krs = ? WHERE id = ?', 
+                [nama, sn, nim, email, id_rfid, jenis_kelamin || 'L', req.file.filename, userId]);
+            
+            // Re-parse KRS baru
+            try {
+                const parseResult = await runPythonScript('pdfParserController.py', [req.file.path]);
+                await connection.query('DELETE FROM member_courses WHERE user_id = ?', [userId]);
+                if (parseResult.status === 'success' && parseResult.data.length > 0) {
+                    const courseValues = parseResult.data.map(c => [userId, c.matakuliah, c.sks, c.hari, c.jamMulai, c.jamSelesai]);
+                    await connection.query('INSERT INTO member_courses (user_id, matakuliah, sks, hari, jam_mulai, jam_selesai) VALUES ?', [courseValues]);
+                }
+            } catch (err) {
+                console.error('Error mem-parsing PDF KRS saat update:', err);
+            }
+        } else {
+            await connection.query('UPDATE users SET nama = ?, sn = ?, nim = ?, email = ?, rfid_tag = ?, jenis_kelamin = ? WHERE id = ?', 
+                [nama, sn, nim, email, id_rfid, jenis_kelamin || 'L', userId]);
+        }
+
+        if (parsedJadwalPiket.length > 0) {
+            await connection.query('DELETE FROM schedules WHERE user_id = ?', [userId]);
+            const jadwalValues = parsedJadwalPiket.map(jadwal => [userId, jadwal.shift_id, jadwal.hari]);
+            await connection.query('INSERT INTO schedules (user_id, shift_id, hari_piket) VALUES ?', [jadwalValues]);
         }
 
         await connection.commit();
@@ -153,8 +205,15 @@ const hapusAnggota = async (req, res) => {
     const userId = req.params.id;
     
     try {
+        const [[user]] = await db.query('SELECT file_krs FROM users WHERE id = ? AND role = "Anggota"', [userId]);
+        
         const [result] = await db.query('DELETE FROM users WHERE id = ? AND role = "Anggota"', [userId]);
         if (result.affectedRows === 0) return res.status(404).json({ status: 'error', message: 'Data anggota tidak ditemukan.' });
+
+        if (user && user.file_krs) {
+            const filePath = path.join(__dirname, '../uploads/krs', user.file_krs);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
 
         res.status(200).json({ status: 'success', message: 'Data anggota beserta riwayatnya berhasil dihapus.' });
     } catch (error) {

@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const { cekSistemAktif } = require('./systemController');
+const { triggerSheetSync } = require('./adminSheetsController');
 
 // ── POST /api/rfid/tap — Handler Utama Mesin RFID ──
 const tapKartu = async (req, res) => {
@@ -68,6 +69,10 @@ const handleTapMasuk = async (res, user) => {
     }
 
     await db.query('INSERT INTO attendances (user_id, shift_id, tanggal, status) VALUES (?, ?, CURDATE(), "Sedang Piket")', [user.id, jadwal[0].shift_id]);
+    
+    // Trigger Sync ke Google Sheets secara Asynchronous (Fire-and-forget)
+    triggerSheetSync().catch(err => console.error('[SHEETS] Gagal sync otomatis saat Tap Masuk:', err.message));
+
     return res.status(200).json({ status: 'success', message: `Tap masuk berhasil. Selamat bertugas, ${user.nama}!` });
 };
 
@@ -96,6 +101,9 @@ const handleTapKeluar = async (res, user, absensiAktif) => {
     const pesanDurasi = isCapped 
         ? ` Durasi dicatat ${durasiFinal} menit (dibatasi sampai akhir shift ${jamSelesaiStr}).`
         : ` Durasi piket: ${durasiFinal} menit.`;
+
+    // Trigger Sync ke Google Sheets secara Asynchronous (Fire-and-forget)
+    triggerSheetSync().catch(err => console.error('[SHEETS] Gagal sync otomatis saat Tap Keluar:', err.message));
 
     return res.status(200).json({ status: 'success', message: `Tap keluar berhasil. Terima kasih, ${user.nama}!${pesanDurasi}` });
 };
