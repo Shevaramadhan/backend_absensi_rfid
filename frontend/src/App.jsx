@@ -12,6 +12,7 @@ import AdminEditAnggota from './pages/admin/AdminEditAnggota';
 import AdminLaporan from './pages/admin/AdminLaporan';
 import AdminPengajuan from './pages/admin/AdminPengajuan';
 import AdminJadwal from './pages/admin/AdminJadwal';
+import AdminPengaturan from './pages/admin/AdminPengaturan';
 
 import AnggotaLayout from './components/layouts/AnggotaLayout';
 import AnggotaDashboard from './pages/anggota/AnggotaDashboard';
@@ -37,6 +38,7 @@ const App = () => {
         <Route path="laporan" element={<AdminLaporan />} />
         <Route path="pengajuan" element={<AdminPengajuan />} />
         <Route path="jadwal" element={<AdminJadwal />} />
+        <Route path="pengaturan" element={<AdminPengaturan />} />
       </Route>
 
       {/* ANGGOTA ROUTES */}

@@ -11,7 +11,8 @@ import {
   ChevronDown,
   ChevronRight,
   UserPlus,
-  Menu
+  Menu,
+  Settings
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -33,6 +34,7 @@ const AdminLayout = () => {
     { name: 'Laporan', path: '/admin/laporan', icon: <FileText size={20} /> },
     { name: 'Pengajuan', path: '/admin/pengajuan', icon: <FileSignature size={20} /> },
     { name: 'Jadwal Piket', path: '/admin/jadwal', icon: <CalendarDays size={20} /> },
+    { name: 'Pengaturan', path: '/admin/pengaturan', icon: <Settings size={20} /> },
   ];
 
   const isAnggotaActive = location.pathname.includes('/admin/anggota');
