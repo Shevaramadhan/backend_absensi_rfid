@@ -76,7 +76,7 @@ const getAnggota = async (req, res) => {
 
     try {
         // Parallel queries untuk total & rows
-        const [[[{ total }], [rows]]] = await Promise.all([
+        const [countResult, dataResult] = await Promise.all([
             db.query(`SELECT COUNT(DISTINCT u.id) AS total FROM users u WHERE u.role = 'Anggota' AND (u.nama LIKE ? OR u.nim LIKE ? OR u.rfid_tag LIKE ?)`, [searchParam, searchParam, searchParam]),
             db.query(`
                 SELECT u.id, u.nama, u.sn, u.nim, u.email, u.rfid_tag, u.created_at,
@@ -88,6 +88,9 @@ const getAnggota = async (req, res) => {
                 GROUP BY u.id ORDER BY u.nama ASC LIMIT ? OFFSET ?
             `, [searchParam, searchParam, searchParam, limit, offset])
         ]);
+
+        const total = countResult[0][0].total;
+        const rows = dataResult[0];
 
         const anggota = rows.map(u => ({
             ...u,
