@@ -3,11 +3,41 @@ const router = express.Router();
 const { verifyAnggota } = require('../middleware/anggotaAuthMiddleware');
 const dashboardController = require('../controllers/anggotaDashboardController');
 const { upload, compressImage } = require('../middleware/uploadMiddleware');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const PengajuanController = require('../controllers/anggotaPengajuanController');
 const authController = require('../controllers/authControllers');
 const exportController = require('../controllers/exportController');
 const jadwalController = require('../controllers/adminJadwalController');
 const krsController = require('../controllers/anggotaKrsController');
+
+// Konfigurasi khusus untuk Upload PDF KRS
+const krsDir = path.join(process.cwd(), 'uploads/krs');
+if (!fs.existsSync(krsDir)) {
+    fs.mkdirSync(krsDir, { recursive: true });
+}
+
+const storageKrs = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/krs/');
+    },
+    filename: (req, file, cb) => {
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '');
+        cb(null, 'temp-' + Date.now() + '-' + safeName);
+    }
+});
+
+const uploadKrs = multer({ 
+    storage: storageKrs,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Hanya file PDF yang diizinkan untuk KRS.'), false);
+        }
+    }
+});
 
 /**
  * @swagger
@@ -188,7 +218,7 @@ router.post('/krs', krsController.saveKrs);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/krs/parse-pdf', upload.single('krs_pdf'), krsController.parsePdfKrs);
+router.post('/krs/parse-pdf', uploadKrs.single('krs_pdf'), krsController.parsePdfKrs);
 
 
 // ==========================================
