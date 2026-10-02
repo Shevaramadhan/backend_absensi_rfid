@@ -153,4 +153,30 @@ const kirimEmailResetPassword = async (email, namaUser, resetUrl) => {
     }
 };
 
-module.exports = { login, changePassword, forgotPassword, resetPassword };
+// ── PUT /api/anggota/profile — Update Profile (Nama) ──
+const updateProfile = async (req, res) => {
+    const userId = req.user.id;
+    const { nama } = req.body;
+
+    if (!nama || nama.trim() === '') {
+        return res.status(400).json({ status: 'error', message: 'Nama tidak boleh kosong.' });
+    }
+
+    try {
+        await db.query('UPDATE users SET nama = ? WHERE id = ?', [nama, userId]);
+        
+        // Ambil data user yang terbaru untuk dikirim kembali (tanpa password)
+        const [[user]] = await db.query('SELECT id, nim, sn, nama, role, jabatan, no_hp, email FROM users WHERE id = ?', [userId]);
+        
+        res.status(200).json({ 
+            status: 'success', 
+            message: 'Profil berhasil diperbarui.',
+            user 
+        });
+    } catch (error) {
+        console.error('Error Update Profile:', error);
+        res.status(500).json({ status: 'error', message: 'Gagal memperbarui profil.' });
+    }
+};
+
+module.exports = { login, changePassword, forgotPassword, resetPassword, updateProfile };

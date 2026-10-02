@@ -170,6 +170,32 @@ router.get('/pengajuan', PengajuanController.getPengajuanAnggota);
 router.put('/change-password', authController.changePassword);
 
 // ==========================================
+// MENU: UPDATE PROFIL ANGGOTA
+// ==========================================
+/**
+ * @swagger
+ * /api/anggota/profile:
+ *   put:
+ *     summary: Update data profil (Nama) anggota (wajib login)
+ *     tags: [Anggota]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nama:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Profil berhasil diperbarui
+ */
+router.put('/profile', authController.updateProfile);
+
+// ==========================================
 // MENU: MELIHAT JADWAL PIKET (GRID)
 // ==========================================
 /**
