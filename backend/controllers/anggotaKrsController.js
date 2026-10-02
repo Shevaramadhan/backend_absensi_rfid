@@ -19,7 +19,6 @@ const ensureTableExists = async () => {
 
 const getKrs = async (req, res) => {
     try {
-        await ensureTableExists();
         const userId = req.user.id;
         const [rows] = await db.query('SELECT * FROM member_courses WHERE user_id = ?', [userId]);
         
@@ -57,7 +56,6 @@ const saveKrs = async (req, res) => {
 
     const connection = await db.getConnection();
     try {
-        await ensureTableExists();
         await connection.beginTransaction();
 
         // Hapus krs lama untuk user ini
