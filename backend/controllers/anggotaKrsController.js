@@ -97,10 +97,10 @@ const parsePdfKrs = async (req, res) => {
         // Panggil script python
         const result = await runPythonScript('pdfParserController.py', [filePath]);
 
-        // Opsional: Hapus file setelah diparse
-        // fs.unlinkSync(filePath);
-
         if (result.status === 'success') {
+            // Simpan nama file ke database agar admin bisa melihat bukti fisik KRS
+            await db.query('UPDATE users SET file_krs = ? WHERE id = ?', [req.file.filename, req.user.id]);
+
             res.status(200).json({ status: 'success', data: result.data, message: result.message });
         } else {
             res.status(400).json({ status: 'error', message: result.message || 'Gagal ekstrak PDF.' });
