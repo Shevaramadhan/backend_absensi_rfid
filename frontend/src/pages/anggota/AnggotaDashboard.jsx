@@ -74,6 +74,23 @@ const AnggotaDashboard = () => {
     }
   };
 
+  const handleExportLaporan = async () => {
+    try {
+      const res = await api.get('/api/anggota/laporan/export?format=pdf', {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Laporan_Kehadiran_Anggota.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      alert('Gagal mendownload laporan absensi.');
+    }
+  };
+
   const handleKameraClick = () => {
     // Cari rekam kehadiran hari ini
     const today = new Date().toDateString();
@@ -276,7 +293,7 @@ const AnggotaDashboard = () => {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-black">Table Rekap Kehadiran Piket Anda</h2>
           <button 
-            onClick={() => window.open('/api/anggota/laporan/export?format=pdf', '_blank')}
+            onClick={handleExportLaporan}
             className="flex items-center gap-2 bg-[#d69f36] hover:bg-[#c28e2e] text-white px-4 py-2 rounded-md font-medium transition-colors text-sm"
           >
             <Download size={16} />
