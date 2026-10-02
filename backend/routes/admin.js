@@ -218,6 +218,7 @@ router.get('/anggota/:id', anggotaController.getAnggotaById);
  *         description: Server error
  */
 router.put('/anggota/:id', uploadKrs.single('file_krs'), anggotaController.editAnggota);
+router.post('/anggota/bulk-delete', anggotaController.hapusAnggotaBulk);
 router.delete('/anggota/:id', anggotaController.hapusAnggota);
 
 // ==========================================

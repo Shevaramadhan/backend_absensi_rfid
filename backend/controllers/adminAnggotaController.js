@@ -227,6 +227,35 @@ const hapusAnggota = async (req, res) => {
     }
 };
 
+// ── POST /api/admin/anggota/bulk-delete — Hapus Banyak Anggota ──
+const hapusAnggotaBulk = async (req, res) => {
+    const { ids } = req.body;
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ status: 'error', message: 'Tidak ada data yang dipilih untuk dihapus.' });
+    }
+
+    try {
+        const [users] = await db.query('SELECT file_krs FROM users WHERE id IN (?) AND role = "Anggota"', [ids]);
+        
+        const [result] = await db.query('DELETE FROM users WHERE id IN (?) AND role = "Anggota"', [ids]);
+        if (result.affectedRows === 0) return res.status(404).json({ status: 'error', message: 'Data anggota tidak ditemukan.' });
+
+        // Hapus file KRS yang terhubung
+        users.forEach(user => {
+            if (user && user.file_krs) {
+                const filePath = path.join(__dirname, '../uploads/krs', user.file_krs);
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            }
+        });
+
+        res.status(200).json({ status: 'success', message: `${result.affectedRows} data anggota berhasil dihapus.` });
+    } catch (error) {
+        console.error('Error Hapus Bulk Anggota:', error);
+        res.status(500).json({ status: 'error', message: 'Gagal menghapus data anggota.' });
+    }
+};
+
 // ── HELPER: Template Email Selamat Datang ──
 const kirimEmailSelamatDatang = async (email, nama, nim) => {
     const subject = 'Akun Absensi Kamu Telah Dibuat — Neo Telemetri';
@@ -248,4 +277,4 @@ const kirimEmailSelamatDatang = async (email, nama, nim) => {
     }
 };
 
-module.exports = { tambahAnggota, getAnggota, getAnggotaById, editAnggota, hapusAnggota };
+module.exports = { tambahAnggota, getAnggota, getAnggotaById, editAnggota, hapusAnggota, hapusAnggotaBulk };
