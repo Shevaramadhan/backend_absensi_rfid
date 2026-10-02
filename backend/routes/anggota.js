@@ -7,6 +7,7 @@ const PengajuanController = require('../controllers/anggotaPengajuanController')
 const authController = require('../controllers/authControllers');
 const exportController = require('../controllers/exportController');
 const jadwalController = require('../controllers/adminJadwalController');
+const krsController = require('../controllers/anggotaKrsController');
 
 /**
  * @swagger
@@ -151,6 +152,43 @@ router.put('/change-password', authController.changePassword);
  *       - bearerAuth: []
  */
 router.get('/jadwal', jadwalController.getSemuaJadwal);
+
+
+// ==========================================
+// MENU: KELOLA KRS (JADWAL SAYA)
+// ==========================================
+/**
+ * @swagger
+ * /api/anggota/krs:
+ *   get:
+ *     summary: Mendapatkan jadwal KRS anggota
+ *     tags: [Anggota]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/krs', krsController.getKrs);
+
+/**
+ * @swagger
+ * /api/anggota/krs:
+ *   post:
+ *     summary: Menyimpan jadwal KRS secara manual
+ *     tags: [Anggota]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/krs', krsController.saveKrs);
+
+/**
+ * @swagger
+ * /api/anggota/krs/parse-pdf:
+ *   post:
+ *     summary: Mengekstrak KRS dari file PDF menggunakan ML
+ *     tags: [Anggota]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/krs/parse-pdf', upload.single('krs_pdf'), krsController.parsePdfKrs);
 
 
 // ==========================================
