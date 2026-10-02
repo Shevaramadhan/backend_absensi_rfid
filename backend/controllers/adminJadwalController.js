@@ -126,7 +126,34 @@ const getRekomendasi = async (req, res) => {
 
     } catch (error) {
         console.error('Error Get Rekomendasi ML:', error);
-        res.status(500).json({ status: 'error', message: 'Gagal memuat daftar rekomendasi AI.' });
+        
+        // Fallback: Jika script Python gagal (misal belum di-install di server), 
+        // kita tetap kembalikan semua anggota agar Admin bisa assign secara manual.
+        try {
+            const [fallbackUsers] = await db.query("SELECT id AS user_id, nama, sn FROM users WHERE role='Anggota'");
+            
+            // Ambil jadwal existing untuk mengecek apakah sudah terjadwal
+            const [existingSchedules] = await db.query("SELECT user_id FROM schedules WHERE hari_piket = ? AND shift_id = ?", [hari, shift_id]);
+            const scheduledUserIds = existingSchedules.map(s => s.user_id);
+
+            const fallbackData = fallbackUsers.map(u => ({
+                user_id: u.user_id,
+                nama: u.nama,
+                sn: u.sn || "-",
+                status: 'Mode Manual (Rekomendasi AI Tidak Aktif)',
+                bisa_ditugaskan: true,
+                sudah_terjadwal: scheduledUserIds.includes(u.user_id)
+            }));
+
+            return res.status(200).json({ 
+                status: 'success', 
+                message: 'AI Gagal. Beralih ke Mode Manual.',
+                data: fallbackData 
+            });
+        } catch (fallbackError) {
+            console.error('Error Fallback:', fallbackError);
+            return res.status(500).json({ status: 'error', message: 'Gagal memuat daftar rekomendasi AI.' });
+        }
     }
 };
 
