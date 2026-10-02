@@ -78,7 +78,7 @@ const saveKrs = async (req, res) => {
     } catch (error) {
         await connection.rollback();
         console.error('Error Save KRS:', error);
-        res.status(500).json({ status: 'error', message: 'Gagal menyimpan jadwal KRS.' });
+        res.status(500).json({ status: 'error', message: 'Gagal menyimpan jadwal KRS. Error DB: ' + error.message });
     } finally {
         connection.release();
     }
