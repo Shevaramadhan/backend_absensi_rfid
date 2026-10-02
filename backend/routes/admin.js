@@ -600,6 +600,8 @@ router.post('/sheets/sync', sheetsController.syncAbsensiKeSheets);
 // ==========================================
 // MENU: EXPORT LAPORAN
 // ==========================================
+
+router.put('/laporan/kehadiran/:id', require('../controllers/adminLaporanController').updateKehadiranManual);
 /**
  * @swagger
  * /api/admin/laporan/export:

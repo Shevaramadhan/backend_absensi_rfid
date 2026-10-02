@@ -84,6 +84,58 @@ const getLaporan = async (req, res) => {
     }
 };
 
+const updateKehadiranManual = async (req, res) => {
+    const { id } = req.params;
+    const { status, waktu_masuk, waktu_keluar } = req.body;
+
+    if (!status) {
+        return res.status(400).json({ status: 'error', message: 'Status kehadiran harus diisi.' });
+    }
+
+    try {
+        let query = 'UPDATE attendances SET status = ?';
+        const params = [status];
+        
+        if (waktu_masuk !== undefined) {
+            query += ', waktu_masuk = ?';
+            params.push(waktu_masuk || null);
+        }
+        
+        if (waktu_keluar !== undefined) {
+            query += ', waktu_keluar = ?';
+            params.push(waktu_keluar || null);
+        }
+        
+        if (waktu_masuk && waktu_keluar && waktu_masuk.length >= 5 && waktu_keluar.length >= 5) {
+            const tM = new Date(`1970-01-01T${waktu_masuk.slice(0,5)}:00`);
+            const tK = new Date(`1970-01-01T${waktu_keluar.slice(0,5)}:00`);
+            const diffMs = tK - tM;
+            if (diffMs > 0) {
+                const durasi = Math.floor(diffMs / 60000);
+                query += ', durasi_menit = ?';
+                params.push(durasi);
+            }
+        } else if (status === 'Tidak Hadir' || status === 'Izin' || status === 'Alpa') {
+            query += ', durasi_menit = 0';
+        }
+
+        query += ' WHERE id = ?';
+        params.push(id);
+
+        const [result] = await db.query(query, params);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ status: 'error', message: 'Data absensi tidak ditemukan.' });
+        }
+
+        res.status(200).json({ status: 'success', message: 'Status kehadiran berhasil diperbarui.' });
+    } catch (error) {
+        console.error('Error Update Kehadiran Manual:', error);
+        res.status(500).json({ status: 'error', message: 'Gagal memperbarui kehadiran.' });
+    }
+};
+
 module.exports = {
-    getLaporan
+    getLaporan,
+    updateKehadiranManual
 };
