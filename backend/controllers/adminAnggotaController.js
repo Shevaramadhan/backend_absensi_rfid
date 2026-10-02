@@ -14,8 +14,8 @@ const tambahAnggota = async (req, res) => {
         try { parsedJadwalPiket = JSON.parse(jadwal_piket); } catch (e) { }
     } else { parsedJadwalPiket = jadwal_piket || []; }
 
-    if (!nama || !nim || !sn || !email || !id_rfid || !parsedJadwalPiket.length) {
-        return res.status(400).json({ status: 'error', message: 'Semua field wajib diisi (termasuk jadwal).' });
+    if (!nama || !nim || !sn || !email || !id_rfid) {
+        return res.status(400).json({ status: 'error', message: 'Semua field wajib diisi (kecuali jadwal piket yang opsional).' });
     }
 
     const connection = await db.getConnection();
@@ -30,9 +30,11 @@ const tambahAnggota = async (req, res) => {
         );
         
         const userId = userResult.insertId;
-        const scheduleValues = parsedJadwalPiket.map(jadwal => [userId, jadwal.shift_id, jadwal.hari]); 
         
-        await connection.query('INSERT INTO schedules (user_id, shift_id, hari_piket) VALUES ?', [scheduleValues]);
+        if (parsedJadwalPiket.length > 0) {
+            const scheduleValues = parsedJadwalPiket.map(jadwal => [userId, jadwal.shift_id, jadwal.hari]); 
+            await connection.query('INSERT INTO schedules (user_id, shift_id, hari_piket) VALUES ?', [scheduleValues]);
+        }
 
         // Parsing PDF jika file diupload
         if (req.file) {
